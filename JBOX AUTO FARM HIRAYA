@@ -1,0 +1,160 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+
+local pickup = workspace.PackageJob.Pickup.PickupPart
+local drop = workspace.PackageJob.Drop.DropPart
+
+local COOLDOWN = 8
+local running = false
+local destroyed = false
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "PackageJobGUI"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+-- Main frame
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 220, 0, 120)
+frame.Position = UDim2.new(0.5, -110, 0.5, -60)
+frame.Parent = gui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = frame
+
+-- Title
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -40, 0, 35)
+title.Position = UDim2.new(0, 10, 0, 5)
+title.BackgroundTransparency = 1
+title.Text = "Package Job"
+title.TextSize = 20
+title.Parent = frame
+
+-- X button
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 30, 0, 30)
+closeButton.Position = UDim2.new(1, -35, 0, 5)
+closeButton.Text = "X"
+closeButton.TextSize = 18
+closeButton.Parent = frame
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 6)
+closeCorner.Parent = closeButton
+
+-- Start/Stop button
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(0, 180, 0, 50)
+button.Position = UDim2.new(0.5, -90, 0, 55)
+button.Text = "START"
+button.TextSize = 20
+button.Parent = frame
+
+local buttonCorner = Instance.new("UICorner")
+buttonCorner.CornerRadius = UDim.new(0, 8)
+buttonCorner.Parent = button
+
+-- Make GUI draggable
+local dragging = false
+local dragStart
+local startPosition
+
+local function updateDrag(input)
+    local delta = input.Position - dragStart
+
+    frame.Position = UDim2.new(
+        startPosition.X.Scale,
+        startPosition.X.Offset + delta.X,
+        startPosition.Y.Scale,
+        startPosition.Y.Offset + delta.Y
+    )
+end
+
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        dragging = true
+        dragStart = input.Position
+        startPosition = frame.Position
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (
+        input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch
+    ) then
+        updateDrag(input)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        dragging = false
+    end
+end)
+
+-- Teleport + interact
+local function teleportAndInteract(part)
+    if not running or destroyed then return end
+
+    local character = player.Character or player.CharacterAdded:Wait()
+
+    character:PivotTo(part.CFrame + Vector3.new(0, 3, 0))
+
+    task.wait(0.5)
+
+    if not running or destroyed then return end
+
+    local prompt = part:FindFirstChildWhichIsA("ProximityPrompt", true)
+
+    if prompt then
+        fireproximityprompt(prompt)
+    end
+
+    task.wait(COOLDOWN)
+end
+
+-- Start loop
+local function startLoop()
+    task.spawn(function()
+        while running and not destroyed do
+            teleportAndInteract(pickup)
+
+            if not running or destroyed then
+                break
+            end
+
+            teleportAndInteract(drop)
+        end
+    end)
+end
+
+-- Start/Stop
+button.MouseButton1Click:Connect(function()
+    if destroyed then return end
+
+    running = not running
+
+    if running then
+        button.Text = "STOP"
+        startLoop()
+    else
+        button.Text = "START"
+    end
+end)
+
+-- X button
+closeButton.MouseButton1Click:Connect(function()
+    destroyed = true
+    running = false
+    gui:Destroy()
+end)
