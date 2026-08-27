@@ -1,5 +1,5 @@
 --==================================================
--- QWDGO MENU - With Remote Whitelist System
+-- QWDGO MENU - Ready to Use (Whitelist Fixed)
 --==================================================
 
 local Players = game:GetService("Players")
@@ -11,11 +11,10 @@ while not LocalPlayer do
 end
 
 --==================================================
--- REMOTE WHITELIST (from Discord Bot + GitHub Gist)
+-- REMOTE WHITELIST
 --==================================================
 
--- PALITAN ITO ng Raw URL ng Gist mo
-local WHITELIST_URL = "https://gist.githubusercontent.com/qwdgo-main/d45b8e61e2119a7292d076d820adb34c/raw/2a921593f5e2bf6931a5886bc870f8167b31a180/whitelist.txt"
+local WHITELIST_URL = "https://gist.githubusercontent.com/qwdgo-main/d45b8e61e2119a7292d076d820adb34c/raw/whitelist.json"
 
 local function isWhitelisted()
 	local success, result = pcall(function()
@@ -29,19 +28,28 @@ local function isWhitelisted()
 
 	local myId = tostring(LocalPlayer.UserId)
 
-	-- Support both JSON and plain text format
-	if result:find("{") or result:find("%[") then
-		local ok, data = pcall(function()
-			return game:GetService("HttpService"):JSONDecode(result)
-		end)
-		if ok and type(data) == "table" then
-			for _, id in pairs(data) do
+	local ok, data = pcall(function()
+		return game:GetService("HttpService"):JSONDecode(result)
+	end)
+
+	if ok and type(data) == "table" then
+		-- Format: { "whitelist": ["123456", "789"] }
+		if data.whitelist and type(data.whitelist) == "table" then
+			for _, id in pairs(data.whitelist) do
 				if tostring(id) == myId then
 					return true
 				end
 			end
 		end
+
+		-- Format: ["123456", "789"]
+		for _, id in pairs(data) do
+			if type(id) ~= "table" and tostring(id) == myId then
+				return true
+			end
+		end
 	else
+		-- Plain text (one ID per line)
 		for line in string.gmatch(result, "[^\r\n]+") do
 			local cleaned = line:match("^%s*(.-)%s*$")
 			if cleaned == myId then
